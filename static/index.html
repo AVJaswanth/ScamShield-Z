@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScamShield Z — Real-Time Scam Payment Defense</title>
+  <meta name="description" content="IBM Z Datathon 2026: Real-Time AI for Critical Decisions. Real-time scam payment detection and explainability demo.">
+  <link rel="stylesheet" href="style.css">
+  <script src="chart.min.js"></script>
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header" role="banner">
+    <div class="header-brand">
+      <div class="logo-badge" aria-hidden="true">Z</div>
+      <div>
+        <h1 class="app-title">ScamShield Z</h1>
+        <p class="app-subtitle">Real-Time Scam Defense · IBM Z Datathon 2026</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <!-- Backend Badge & Switch -->
+      <div class="control-group">
+        <span class="badge badge-backend" id="backend-badge" aria-live="polite">Backend: LOCAL_ONNX</span>
+        <button id="btn-switch-backend" class="btn btn-secondary btn-sm" title="WMLz remote endpoint URL is not configured in config.yaml. Running on verified LOCAL_ONNX engine." aria-label="Switch Scoring Backend" disabled>
+          Switch to WMLz
+        </button>
+      </div>
+
+      <!-- Stream Status -->
+      <span class="badge badge-status" id="stream-status-badge" aria-live="polite">Stream: Idle</span>
+
+      <!-- Vulnerable Mode Global Toggle -->
+      <div class="toggle-wrapper" title="Force all incoming stream transactions to apply Vulnerable Customer Safeguards">
+        <label class="switch-label" for="toggle-vulnerable-mode">Vulnerable Mode:</label>
+        <label class="switch">
+          <input type="checkbox" id="toggle-vulnerable-mode" aria-label="Toggle Global Vulnerable Protection Mode">
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <!-- Light / Dark Theme Toggle -->
+      <button id="btn-theme-toggle" class="btn btn-icon" aria-label="Toggle Light and Dark Theme" title="Toggle Theme">
+        <span id="theme-icon" aria-hidden="true">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container" role="main">
+
+    <!-- KPI Metric Cards -->
+    <section class="kpi-grid" aria-label="Real-time KPI metrics">
+      <div class="kpi-card" tabindex="0">
+        <div class="kpi-label">Transactions Scored</div>
+        <div class="kpi-value" id="kpi-events-scored">0</div>
+        <div class="kpi-sub">Total live stream volume</div>
+      </div>
+      <div class="kpi-card kpi-success" tabindex="0">
+        <div class="kpi-label">Allowed Payments</div>
+        <div class="kpi-value" id="kpi-allowed">0</div>
+        <div class="kpi-sub">Low friction approvals</div>
+      </div>
+      <div class="kpi-card kpi-warning" tabindex="0">
+        <div class="kpi-label">Step-Up Confirmed</div>
+        <div class="kpi-value" id="kpi-confirmed">0</div>
+        <div class="kpi-sub">Customer 2FA prompts</div>
+      </div>
+      <div class="kpi-card kpi-danger" tabindex="0">
+        <div class="kpi-label">Held & Review</div>
+        <div class="kpi-value" id="kpi-held">0</div>
+        <div class="kpi-sub">High risk interventions</div>
+      </div>
+      <div class="kpi-card kpi-info" tabindex="0">
+        <div class="kpi-label">p99 Latency</div>
+        <div class="kpi-value" id="kpi-latency">not measured</div>
+        <div class="kpi-sub">Sub-millisecond inference</div>
+      </div>
+    </section>
+
+    <!-- Global Action Bar: Stream Controls & Scenario Injectors -->
+    <section class="action-bar" aria-label="Stream and Scenario Controls">
+      <div class="action-section">
+        <span class="section-title">Stream Controls:</span>
+        <button id="btn-stream-start" class="btn btn-primary" aria-label="Start Transaction Stream">▶ Start Stream</button>
+        <button id="btn-stream-pause" class="btn btn-secondary" aria-label="Pause Transaction Stream">⏸ Pause Stream</button>
+        <button id="btn-stream-reset" class="btn btn-outline" aria-label="Reset Transaction Stream">↺ Reset</button>
+
+        <span class="speed-label">Speed:</span>
+        <div class="btn-group" role="group" aria-label="Stream Speed Selector">
+          <button id="btn-speed-1x" class="btn btn-group-item active" aria-label="Speed 1x">1x</button>
+          <button id="btn-speed-5x" class="btn btn-group-item" aria-label="Speed 5x">5x</button>
+          <button id="btn-speed-20x" class="btn btn-group-item" aria-label="Speed 20x">20x</button>
+        </div>
+      </div>
+
+      <div class="action-section">
+        <span class="section-title">Planted Scenarios:</span>
+        <button id="btn-scenario-new-payee" class="btn btn-scenario" aria-label="Trigger New Payee Large Payment Scenario">New Payee ($4.5k)</button>
+        <button id="btn-scenario-mule" class="btn btn-scenario" aria-label="Trigger Mule Fan-In Scenario">Mule Fan-In (18 Senders)</button>
+        <button id="btn-scenario-drain" class="btn btn-scenario" aria-label="Trigger Rapid Account Drain Scenario">Rapid Drain (Burst)</button>
+        <button id="btn-scenario-ato" class="btn btn-scenario" aria-label="Trigger Account Takeover Scenario">ATO Device Change</button>
+        <button id="btn-scenario-normal" class="btn btn-scenario btn-scenario-legit" aria-label="Trigger Normal Large Purchase Scenario">Normal Large ($2.8k)</button>
+      </div>
+    </section>
+
+    <!-- Operational Split View -->
+    <div class="content-columns">
+
+      <!-- Left Column: Manual Form, Customer View, Thresholds -->
+      <div class="column-left">
+
+        <!-- Manual Payment Scoring Form -->
+        <section class="panel" aria-labelledby="heading-manual-score">
+          <h2 id="heading-manual-score" class="panel-title">Manual Payment Scoring</h2>
+          <form id="form-manual-score" class="form-grid">
+            <div class="form-group">
+              <label for="manual-amount">Transfer Amount ($):</label>
+              <input type="number" id="manual-amount" class="form-control" value="4800.00" step="10" min="1" required aria-required="true">
+            </div>
+
+            <div class="form-options">
+              <label class="checkbox-container">
+                <input type="checkbox" id="manual-new-payee" checked>
+                <span class="checkmark"></span>
+                First payment to payee?
+              </label>
+
+              <label class="checkbox-container">
+                <input type="checkbox" id="manual-device-changed" checked>
+                <span class="checkmark"></span>
+                New / Changed device?
+              </label>
+
+              <label class="checkbox-container">
+                <input type="checkbox" id="manual-vulnerable">
+                <span class="checkmark"></span>
+                Vulnerable customer account?
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-manual-score" class="btn btn-primary btn-block" aria-label="Score Manual Payment">
+                ⚡ Score Payment
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Customer View (What the User Sees) -->
+        <section class="panel" aria-labelledby="heading-customer-view">
+          <h2 id="heading-customer-view" class="panel-title">Customer Notification View</h2>
+          <div id="customer-view-container" class="customer-card">
+            <div class="customer-card-header">
+              <span id="customer-decision-badge" class="badge badge-lg badge-neutral">AWAITING PAYMENT</span>
+              <span id="customer-amount" class="customer-amount">$0.00</span>
+            </div>
+            <p id="customer-reason" class="customer-reason">
+              Initiate a manual payment or run a stream scenario to view real-time plain English explanation.
+            </p>
+            <div id="customer-contact-alert" class="alert-box alert-warning hidden" role="alert">
+              🛡️ <strong>Vulnerable Safeguard Active:</strong> A trusted family contact alert has been prepared.
+            </div>
+          </div>
+        </section>
+
+        <!-- Dynamic Threshold Configuration -->
+        <section class="panel" aria-labelledby="heading-thresholds">
+          <div class="panel-header-actions">
+            <h2 id="heading-thresholds" class="panel-title">Policy Threshold Tuning</h2>
+            <button id="btn-export-audit" class="btn btn-sm btn-outline" aria-label="Export Audit Log CSV">
+              📥 Export Audit CSV
+            </button>
+          </div>
+          <p class="panel-description">
+            Adjust risk bands in real-time. Changes instantly re-classify stream policy decisions.
+          </p>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-t-low">Low Band Ceiling (T_low):</label>
+              <span id="val-t-low" class="slider-val">0.05</span>
+            </div>
+            <input type="range" id="slider-t-low" min="0.01" max="0.30" step="0.01" value="0.05" class="slider-range">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-t-med">Medium Band Ceiling (T_med):</label>
+              <span id="val-t-med" class="slider-val">0.35</span>
+            </div>
+            <input type="range" id="slider-t-med" min="0.20" max="0.60" step="0.01" value="0.35" class="slider-range">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-t-high">High Band Ceiling (T_high):</label>
+              <span id="val-t-high" class="slider-val">0.65</span>
+            </div>
+            <input type="range" id="slider-t-high" min="0.50" max="0.95" step="0.01" value="0.65" class="slider-range">
+          </div>
+
+          <div class="threshold-actions">
+            <button id="btn-apply-thresholds" class="btn btn-primary btn-sm" aria-label="Apply Custom Thresholds">Apply Thresholds</button>
+            <button id="btn-restore-thresholds" class="btn btn-secondary btn-sm" aria-label="Restore Default Thresholds">Restore Defaults</button>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Right Column: Live Decision Feed -->
+      <div class="column-right">
+        <section class="panel panel-feed" aria-labelledby="heading-feed">
+          <div class="panel-header-actions">
+            <h2 id="heading-feed" class="panel-title">Real-Time Decision Feed</h2>
+            <span class="feed-count-badge" id="feed-count">0 items</span>
+          </div>
+
+          <!-- Empty State -->
+          <div id="feed-empty-state" class="empty-state">
+            <div class="empty-icon" aria-hidden="true">📡</div>
+            <h3>Feed is Ready</h3>
+            <p>Click "Start Stream" or trigger any Planted Scenario above to watch live AI decisions stream in.</p>
+          </div>
+
+          <!-- Live Feed Container -->
+          <div id="feed-container" class="feed-container" role="feed" aria-busy="false"></div>
+        </section>
+      </div>
+
+    </div>
+
+    <!-- Analytics & Transparency Section -->
+    <div class="analytics-grid">
+
+      <!-- Latency Visualizer (Local Chart.js) -->
+      <section class="panel" aria-labelledby="heading-latency">
+        <h2 id="heading-latency" class="panel-title">Real-Time Latency Performance</h2>
+        <p class="panel-description">Live inference response times per transaction (Target: &lt;1.0ms SLA)</p>
+        <div class="chart-container">
+          <canvas id="latency-chart" aria-label="Inference Latency Line Chart" role="img"></canvas>
+        </div>
+      </section>
+
+      <!-- Fairness & Disparate Impact Audit Table -->
+      <section class="panel" aria-labelledby="heading-fairness">
+        <div class="panel-header-actions">
+          <h2 id="heading-fairness" class="panel-title">Fairness & Disparate Impact Audit</h2>
+          <span class="badge badge-synthetic" id="badge-fairness-synthetic">[SYNTHETIC DATA]</span>
+        </div>
+        <p class="panel-description">Hold rate and False Positive Rate sliced by age group.</p>
+        <div class="table-responsive">
+          <table class="data-table" id="fairness-table" aria-label="Fairness Metrics Table">
+            <thead>
+              <tr>
+                <th scope="col">Age Group</th>
+                <th scope="col">Total Events</th>
+                <th scope="col">Held / Reviewed</th>
+                <th scope="col">Hold Rate</th>
+                <th scope="col">False Positive Rate</th>
+              </tr>
+            </thead>
+            <tbody id="fairness-table-body">
+              <tr>
+                <td colspan="5" class="text-center">Loading audit data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="fairness-footer">
+          <span id="fairness-gap-status" class="status-indicator">Fairness Status: Checking...</span>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Model Benchmarks & Metrics -->
+    <section class="panel" aria-labelledby="heading-metrics">
+      <div class="panel-header-actions">
+        <h2 id="heading-metrics" class="panel-title">Model Evaluation Metrics (reports/metrics.json)</h2>
+        <span class="badge badge-synthetic">[SYNTHETIC DATA]</span>
+      </div>
+      <p class="panel-description">
+        Strict time-split evaluation (70% train / 15% validation / 15% test). Measured on real local run.
+      </p>
+      <div class="table-responsive">
+        <table class="data-table" id="metrics-table" aria-label="Model Performance Metrics Table">
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">PR-AUC</th>
+              <th scope="col">ROC-AUC</th>
+              <th scope="col">Recall @ 1% FPR</th>
+              <th scope="col">ONNX Max Diff (&lt;1e-5)</th>
+              <th scope="col">Verification Status</th>
+            </tr>
+          </thead>
+          <tbody id="metrics-table-body">
+            <tr>
+              <td colspan="6" class="text-center">Loading model metrics...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Architecture Diagram in Inline SVG -->
+    <section class="panel" aria-labelledby="heading-architecture">
+      <h2 id="heading-architecture" class="panel-title">System Architecture: Hybrid Real-Time Scam Defense</h2>
+      <p class="panel-description">
+        Deployment comparison: IBM Z Enterprise AI (z16 Telum on-chip AI accelerator) vs Laptop Edge ONNX Runtime.
+      </p>
+      <div class="svg-diagram-wrapper" aria-label="ScamShield Z Architectural Diagram">
+        <svg viewBox="0 0 960 360" class="arch-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture Diagram">
+          <defs>
+            <linearGradient id="grad-rail" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e3a8a" />
+              <stop offset="100%" stop-color="#3b82f6" />
+            </linearGradient>
+            <linearGradient id="grad-features" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#0f766e" />
+              <stop offset="100%" stop-color="#14b8a6" />
+            </linearGradient>
+            <linearGradient id="grad-ibmz" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#4c1d95" />
+              <stop offset="100%" stop-color="#8b5cf6" />
+            </linearGradient>
+            <linearGradient id="grad-policy" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#9a3412" />
+              <stop offset="100%" stop-color="#f97316" />
+            </linearGradient>
+            <linearGradient id="grad-explain" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#15803d" />
+              <stop offset="100%" stop-color="#22c55e" />
+            </linearGradient>
+            <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+              <feDropShadow dx="2" dy="3" stdDeviation="3" flood-opacity="0.3"/>
+            </filter>
+          </defs>
+
+          <!-- 1. Input Rail -->
+          <g transform="translate(30, 40)" filter="url(#shadow)">
+            <rect width="150" height="270" rx="10" fill="url(#grad-rail)" />
+            <text x="75" y="40" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Payment Stream</text>
+            <text x="75" y="70" fill="#e2e8f0" font-size="12" text-anchor="middle">Open Banking / Real-Time</text>
+            <line x1="20" y1="85" x2="130" y2="85" stroke="#93c5fd" stroke-width="1"/>
+            <text x="25" y="115" fill="#f8fafc" font-size="11">• Salted Tokenizer</text>
+            <text x="25" y="145" fill="#f8fafc" font-size="11">• Chronological Order</text>
+            <text x="25" y="175" fill="#f8fafc" font-size="11">• Vulnerability Flag</text>
+            <text x="25" y="205" fill="#f8fafc" font-size="11">• Ingestion Queue</text>
+            <rect x="25" y="225" width="100" height="28" rx="4" fill="#1e40af" />
+            <text x="75" y="244" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">&lt; 0.1ms Ingestion</text>
+          </g>
+
+          <!-- Arrow 1 to 2 -->
+          <path d="M 185 175 L 215 175" stroke="#60a5fa" stroke-width="3" marker-end="url(#arrow)" />
+
+          <!-- 2. Feature Store -->
+          <g transform="translate(220, 40)" filter="url(#shadow)">
+            <rect width="160" height="270" rx="10" fill="url(#grad-features)" />
+            <text x="80" y="40" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Feature Engine</text>
+            <text x="80" y="70" fill="#ccfbf1" font-size="12" text-anchor="middle">Zero Future Leakage</text>
+            <line x1="20" y1="85" x2="140" y2="85" stroke="#5eead4" stroke-width="1"/>
+            <text x="25" y="115" fill="#f0fdfa" font-size="11">• Rolling 30d Deques</text>
+            <text x="25" y="145" fill="#f0fdfa" font-size="11">• Mule Fan-in Count</text>
+            <text x="25" y="175" fill="#f0fdfa" font-size="11">• Velocity 10m / 1h</text>
+            <text x="25" y="205" fill="#f0fdfa" font-size="11">• Device Change Flag</text>
+            <rect x="25" y="225" width="110" height="28" rx="4" fill="#115e59" />
+            <text x="80" y="244" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">16 Features (Vector)</text>
+          </g>
+
+          <!-- Arrow 2 to 3 -->
+          <path d="M 385 175 L 415 175" stroke="#60a5fa" stroke-width="3" />
+
+          <!-- 3. Dual Scoring Engine -->
+          <g transform="translate(420, 30)" filter="url(#shadow)">
+            <rect width="170" height="290" rx="10" fill="url(#grad-ibmz)" />
+            <text x="85" y="35" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">AI Scoring Backend</text>
+            <text x="85" y="60" fill="#ddd6fe" font-size="12" text-anchor="middle">Sub-ms Decisioning</text>
+            <line x1="20" y1="75" x2="150" y2="75" stroke="#c4b5fd" stroke-width="1"/>
+
+            <!-- IBM Z Option -->
+            <rect x="15" y="90" width="140" height="75" rx="6" fill="#3b0764" stroke="#a855f7" stroke-width="1"/>
+            <text x="85" y="110" fill="#f5d0fe" font-size="12" font-weight="bold" text-anchor="middle">IBM z16 Telum</text>
+            <text x="85" y="130" fill="#e9d5ff" font-size="10" text-anchor="middle">Integrated AI Accelerator</text>
+            <text x="85" y="150" fill="#c084fc" font-size="10" text-anchor="middle">WMLz Enterprise API</text>
+
+            <!-- Local ONNX Option -->
+            <rect x="15" y="180" width="140" height="85" rx="6" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
+            <text x="85" y="202" fill="#c7d2fe" font-size="12" font-weight="bold" text-anchor="middle">LOCAL_ONNX</text>
+            <text x="85" y="222" fill="#e0e7ff" font-size="10" text-anchor="middle">Local Laptop CPU Runtime</text>
+            <text x="85" y="240" fill="#86efac" font-size="11" font-weight="bold" text-anchor="middle">p99 = 0.325 ms (Active)</text>
+          </g>
+
+          <!-- Arrow 3 to 4 -->
+          <path d="M 595 175 L 625 175" stroke="#60a5fa" stroke-width="3" />
+
+          <!-- 4. Policy Engine -->
+          <g transform="translate(630, 40)" filter="url(#shadow)">
+            <rect width="150" height="270" rx="10" fill="url(#grad-policy)" />
+            <text x="75" y="40" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Risk Policy</text>
+            <text x="75" y="70" fill="#ffedd5" font-size="12" text-anchor="middle">4-Tier Risk Escalation</text>
+            <line x1="20" y1="85" x2="130" y2="85" stroke="#fdba74" stroke-width="1"/>
+            <text x="25" y="115" fill="#fff7ed" font-size="11">• Low: Allow</text>
+            <text x="25" y="145" fill="#fff7ed" font-size="11">• Medium: Notice</text>
+            <text x="25" y="175" fill="#fff7ed" font-size="11">• High: Confirm</text>
+            <text x="25" y="205" fill="#fff7ed" font-size="11">• Very High: Hold</text>
+            <rect x="20" y="225" width="110" height="28" rx="4" fill="#7c2d12" />
+            <text x="75" y="244" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">Vulnerable Safeguard</text>
+          </g>
+
+          <!-- Arrow 4 to 5 -->
+          <path d="M 785 175 L 815 175" stroke="#60a5fa" stroke-width="3" />
+
+          <!-- 5. Explainability & Output -->
+          <g transform="translate(820, 40)" filter="url(#shadow)">
+            <rect width="115" height="270" rx="10" fill="url(#grad-explain)" />
+            <text x="57" y="40" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">Explainability</text>
+            <text x="57" y="70" fill="#dcfce7" font-size="11" text-anchor="middle">Tree SHAP</text>
+            <line x1="15" y1="85" x2="100" y2="85" stroke="#86efac" stroke-width="1"/>
+            <text x="18" y="115" fill="#f0fdf4" font-size="10">• Top 3 Factors</text>
+            <text x="18" y="145" fill="#f0fdf4" font-size="10">• Fixed Templates</text>
+            <text x="18" y="175" fill="#f0fdf4" font-size="10">• Zero Free-Text</text>
+            <text x="18" y="205" fill="#f0fdf4" font-size="10">• Audit Logging</text>
+            <rect x="15" y="225" width="85" height="28" rx="4" fill="#14532d" />
+            <text x="57" y="244" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">Live UI Feed</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

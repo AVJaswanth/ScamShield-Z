@@ -1,0 +1,38 @@
+# ScamShield Z Configuration File
+# IBM Z Datathon 2026: Real-Time AI for Critical Decisions
+
+data:
+  seed: 42
+  total_events: 200000
+  days: 30
+  senders: 5000
+  payees: 2000
+  salt: "ibm_z_datathon_2026_scamshield_salt"
+  target_fraud_rate: 0.005
+  synthetic_label: "[SYNTHETIC DATA]"
+
+training:
+  train_split: 0.70
+  val_split: 0.15
+  test_split: 0.15
+  parity_tolerance: 0.00001
+  random_state: 42
+
+costs:
+  missed_fraud: 50.0       # Cost of failing to stop a scam payment
+  confirmation_prompt: 1.0  # Friction cost of customer 2FA/prompt
+  wrong_hold: 5.0          # Friction / support cost of false hold
+
+policy:
+  t_low: 0.15              # Score < t_low -> Low risk (ALLOW)
+  t_med: 0.45              # t_low <= Score < t_med -> Medium risk (ALLOW_WITH_NOTICE / CONFIRM)
+  t_high: 0.75             # t_med <= Score < t_high -> High risk (CONFIRM / HOLD)
+                           # Score >= t_high -> Very High risk (HOLD / HUMAN_REVIEW)
+  human_review_amount: 5000.0
+
+fairness:
+  max_hold_rate_gap: 0.05   # Alert if demographic hold-rate gap exceeds 5%
+
+backend:
+  active: "LOCAL_ONNX"     # Options: LOCAL_ONNX, WMLZ_HTTP
+  wmlz_endpoint: ""        # IBM Watson Machine Learning on z/OS REST URL (empty disables button)
