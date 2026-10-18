@@ -48,7 +48,47 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
 ---
 
-## 4. Architecture Diagram
+## 4. Architecture Diagram & Solution Flowchart
+
+> 📄 **Executive PDF Download:** [**`ScamShield_Z_Solution_Flowchart.pdf`**](docs/ScamShield_Z_Solution_Flowchart.pdf) — A single-page, publication-quality A4 solution flowchart with full vector graphics, performance metrics, and policy matrices.
+
+```mermaid
+flowchart TD
+    A["Inbound Payment Event<br/>(Sender, Payee, Amount, Device, Channel, ts)"] --> B["HMAC SHA-256 Tokenization<br/>(Salted Privacy Hashing)"]
+    B --> C["Rolling Feature Store<br/>(Bounded Deques, Zero Future Leakage)"]
+    C --> D{"Dual Scoring Target"}
+    
+    subgraph Engine ["Dual AI Scoring Engine"]
+        D -->|Default Laptop CPU| E["LOCAL_ONNX Runtime<br/>(p50: 0.105ms, p99: 0.492ms)"]
+        D -->|Configurable URL| F["WMLZ_HTTP Adapter<br/>(IBM z16 Telum NNPA)"]
+    end
+
+    E --> G["Fraud Probability P(fraud)"]
+    F --> G
+
+    G --> H{"4-Tier Policy & Escalation"}
+
+    H -->|P < 0.05| I["ALLOW<br/>(Frictionless STP)"]
+    H -->|"0.05 <= P < 0.35"| J["ALLOW WITH NOTICE<br/>(Standard)"]
+    H -->|"0.35 <= P < 0.65"| K["CONFIRM<br/>(Step-up 2FA)"]
+    H -->|"P >= 0.65 & Amt < $5k"| L["HOLD<br/>(4h Cooling-off)"]
+    H -->|"P >= 0.65 & Amt >= $5k"| M["HUMAN REVIEW<br/>(Fraud Ops Queue)"]
+
+    H -.->|Vulnerable User Flag| N["Escalate +1 Band &<br/>Alert Trusted Contact"]
+
+    subgraph Governance ["In-Path Governance Rails"]
+        O["Tree SHAP Explainer<br/>(Deterministic Templates)"]
+        P["Fairness & Disparate Impact<br/>(Demographic Parity Audit)"]
+        Q["Immutable Audit Log<br/>(CSV Export)"]
+    end
+
+    I --> Governance
+    J --> Governance
+    K --> Governance
+    L --> Governance
+    M --> Governance
+    Governance --> R["Live SSE Stream & Customer Web UI"]
+```
 
 ```
 +----------------------------------------------------------------------------------------------------+
