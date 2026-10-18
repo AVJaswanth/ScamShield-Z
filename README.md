@@ -207,8 +207,53 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
 ---
 
-## 9. Dataset Licences and Sources
+## 9. Open-Source Resources, Datasets, and Licenses
 
-- **Primary Stream:** Seeded, synthetically generated payment stream created by `src/generate_data.py`. All events and IDs are generated locally and marked with `[SYNTHETIC DATA]`. Distributed under Apache License 2.0.
-- **Optional Benchmarks:** Support is built-in for optional evaluation on the ULB Machine Learning Group Credit Card Fraud Detection dataset (Open Database License) and PaySim synthetic financial simulator (CC BY-SA 4.0).
-- **Libraries:** Chart.js (MIT License), LightGBM (MIT License), ONNX Runtime (MIT License), FastAPI (MIT License).
+### Core Machine Learning & Model Export
+- **LightGBM:** High-performance gradient boosting framework.  
+  - Repository: [https://github.com/microsoft/LightGBM](https://github.com/microsoft/LightGBM) | License: MIT
+- **ONNX (Open Neural Network Exchange):** Open standard format for machine learning interoperability.  
+  - Website: [https://onnx.ai](https://onnx.ai) | Repository: [https://github.com/onnx/onnx](https://github.com/onnx/onnx) | License: Apache 2.0
+- **ONNX Runtime:** High-performance scoring engine for ONNX models across hardware backends.  
+  - Website: [https://onnxruntime.ai](https://onnxruntime.ai) | Repository: [https://github.com/microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | License: MIT
+- **skl2onnx & onnxmltools:** Converters for scikit-learn and tree-based pipelines to ONNX.  
+  - skl2onnx: [https://github.com/onnx/sklearn-onnx](https://github.com/onnx/sklearn-onnx) | License: Apache 2.0  
+  - onnxmltools: [https://github.com/onnx/onnxmltools](https://github.com/onnx/onnxmltools) | License: Apache 2.0
+- **scikit-learn:** Baseline machine learning algorithms and evaluation metrics.  
+  - Website: [https://scikit-learn.org](https://scikit-learn.org) | Repository: [https://github.com/scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) | License: BSD 3-Clause
+- **NumPy & Pandas:** High-performance array computation and data structures.  
+  - NumPy: [https://numpy.org](https://numpy.org) | Repository: [https://github.com/numpy/numpy](https://github.com/numpy/numpy) | License: BSD 3-Clause  
+  - Pandas: [https://pandas.pydata.org](https://pandas.pydata.org) | Repository: [https://github.com/pandas-dev/pandas](https://github.com/pandas-dev/pandas) | License: BSD 3-Clause
+
+### Backend, API & Streaming
+- **FastAPI:** High-performance modern web framework for building APIs with Python 3.8+.  
+  - Website: [https://fastapi.tiangolo.com](https://fastapi.tiangolo.com) | Repository: [https://github.com/fastapi/fastapi](https://github.com/fastapi/fastapi) | License: MIT
+- **Uvicorn:** Lightning-fast ASGI web server implementation.  
+  - Website: [https://www.uvicorn.org](https://www.uvicorn.org) | Repository: [https://github.com/encode/uvicorn](https://github.com/encode/uvicorn) | License: BSD 3-Clause
+- **Pydantic:** Data validation and settings management using Python type annotations.  
+  - Website: [https://docs.pydantic.dev](https://docs.pydantic.dev) | Repository: [https://github.com/pydantic/pydantic](https://github.com/pydantic/pydantic) | License: MIT
+- **PyYAML:** YAML parser and emitter for Python configuration loading.  
+  - Website: [https://pyyaml.org](https://pyyaml.org) | Repository: [https://github.com/yaml/pyyaml](https://github.com/yaml/pyyaml) | License: MIT
+
+### Frontend & Data Visualization
+- **Chart.js:** Simple yet flexible JavaScript charting for designers & developers (bundled locally for offline execution in `static/chart.umd.min.js`).  
+  - Website: [https://www.chartjs.org](https://www.chartjs.org) | Repository: [https://github.com/chartjs/Chart.js](https://github.com/chartjs/Chart.js) | License: MIT
+
+### Testing, Parity & End-to-End Verification
+- **Pytest:** Comprehensive Python testing framework.  
+  - Website: [https://pytest.org](https://pytest.org) | Repository: [https://github.com/pytest-dev/pytest](https://github.com/pytest-dev/pytest) | License: MIT
+- **Playwright for Python:** Cross-browser headless UI automation and console verification.  
+  - Website: [https://playwright.dev/python](https://playwright.dev/python) | Repository: [https://github.com/microsoft/playwright-python](https://github.com/microsoft/playwright-python) | License: Apache 2.0
+
+### Datasets & Benchmarks
+- **ULB Machine Learning Group Credit Card Fraud Detection:** Real-world European credit card transaction dataset with authentic fraud noise.  
+  - Kaggle: [https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)  
+  - Academic Origin: Machine Learning Group - Université Libre de Bruxelles ([http://mlg.ulb.ac.be](http://mlg.ulb.ac.be))  
+  - License: Open Database License (ODbL) 1.0
+- **PaySim Synthetic Financial Simulator:** Agent-based synthetic financial simulator based on mobile money transactions.  
+  - Kaggle: [https://www.kaggle.com/datasets/ealaxi/paysim1](https://www.kaggle.com/datasets/ealaxi/paysim1)  
+  - Paper: Lopez-Rojas et al., "PaySim: A financial mobile money simulator for fraud detection" ([ResearchGate](https://www.researchgate.net/publication/313138087_PaySim_A_financial_mobile_money_simulator_for_fraud_detection))  
+  - License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+- **ScamShield Primary Stream:** Seeded, synthetically generated payment stream created by `src/generate_data.py`. All events and IDs are generated locally and marked with `[SYNTHETIC DATA]`.  
+  - License: Apache 2.0
+
