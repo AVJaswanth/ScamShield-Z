@@ -13,13 +13,22 @@
   'use strict';
 
   // --- State & DOM References ---
+  const seenEventIds = new Set();
   const state = {
     theme: localStorage.getItem('scamshield_theme') || 'dark',
     activeSpeed: 1.0,
     streamActive: false,
     latencyPoints: [],
     maxChartPoints: 30,
-    chartInstance: null
+    chartInstance: null,
+    kpi: {
+      events_scored: 0,
+      allowed_count: 0,
+      confirmed_count: 0,
+      held_count: 0,
+      human_review_count: 0,
+      p99_latency_ms: 'not measured'
+    }
   };
 
   // DOM Elements
@@ -224,6 +233,14 @@
   }
 
   function addDecisionToFeed(ev) {
+    if (!ev || !ev.id) return;
+    if (seenEventIds.has(ev.id)) return;
+    seenEventIds.add(ev.id);
+    if (seenEventIds.size > 2000) {
+      const iter = seenEventIds.values();
+      for (let i = 0; i < 500; i++) seenEventIds.delete(iter.next().value);
+    }
+
     // Hide empty state
     if (elements.feedEmptyState) {
       elements.feedEmptyState.classList.add('hidden');
@@ -319,6 +336,9 @@
     if (typeof ev.latency_ms === 'number') {
       recordLatencyPoint(ev.latency_ms);
     }
+
+    // Update KPI metrics cards immediately
+    recordEventKPI(ev);
   }
 
   function attachCardActionHandlers(card, id) {
@@ -378,17 +398,46 @@
   }
 
   // --- KPI Updates ---
+  function recordEventKPI(ev) {
+    if (!ev) return;
+    state.kpi.events_scored = (state.kpi.events_scored || 0) + 1;
+    if (ev.decision === 'ALLOW' || ev.decision === 'ALLOW_WITH_NOTICE') {
+      state.kpi.allowed_count = (state.kpi.allowed_count || 0) + 1;
+    } else if (ev.decision === 'CONFIRM') {
+      state.kpi.confirmed_count = (state.kpi.confirmed_count || 0) + 1;
+    } else if (ev.decision === 'HOLD') {
+      state.kpi.held_count = (state.kpi.held_count || 0) + 1;
+    } else if (ev.decision === 'HUMAN_REVIEW') {
+      state.kpi.human_review_count = (state.kpi.human_review_count || 0) + 1;
+    }
+
+    if (typeof ev.latency_ms === 'number' && !isNaN(ev.latency_ms)) {
+      state.latencyPoints.push(ev.latency_ms);
+      if (state.latencyPoints.length > 500) {
+        state.latencyPoints.shift();
+      }
+      const sorted = [...state.latencyPoints].sort((a, b) => a - b);
+      const p99Idx = Math.floor(sorted.length * 0.99);
+      const p99Val = sorted[Math.min(p99Idx, sorted.length - 1)];
+      state.kpi.p99_latency_ms = p99Val.toFixed(3);
+    }
+
+    updateKPIs(state.kpi);
+  }
+
   function updateKPIs(kpi) {
     if (!kpi) return;
-    elements.kpiEventsScored.textContent = (kpi.events_scored || 0).toLocaleString();
-    elements.kpiAllowed.textContent = (kpi.allowed_count || 0).toLocaleString();
-    elements.kpiConfirmed.textContent = (kpi.confirmed_count || 0).toLocaleString();
-    elements.kpiHeld.textContent = ((kpi.held_count || 0) + (kpi.human_review_count || 0)).toLocaleString();
+    if (elements.kpiEventsScored) elements.kpiEventsScored.textContent = (kpi.events_scored || 0).toLocaleString();
+    if (elements.kpiAllowed) elements.kpiAllowed.textContent = (kpi.allowed_count || 0).toLocaleString();
+    if (elements.kpiConfirmed) elements.kpiConfirmed.textContent = (kpi.confirmed_count || 0).toLocaleString();
+    if (elements.kpiHeld) elements.kpiHeld.textContent = ((kpi.held_count || 0) + (kpi.human_review_count || 0)).toLocaleString();
 
-    if (kpi.p99_latency_ms && kpi.p99_latency_ms !== 'not measured') {
-      elements.kpiLatency.textContent = `${kpi.p99_latency_ms} ms`;
-    } else {
-      elements.kpiLatency.textContent = 'not measured';
+    if (elements.kpiLatency) {
+      if (kpi.p99_latency_ms && kpi.p99_latency_ms !== 'not measured') {
+        elements.kpiLatency.textContent = `${kpi.p99_latency_ms} ms`;
+      } else {
+        elements.kpiLatency.textContent = 'not measured';
+      }
     }
   }
 
@@ -451,7 +500,14 @@
         elements.valTHigh.textContent = data.thresholds.t_high;
       }
 
-      updateKPIs(data.kpi);
+      if (data.kpi) {
+        state.kpi = {
+          ...state.kpi,
+          ...data.kpi,
+          p99_latency_ms: (data.kpi.p99_latency_ms && data.kpi.p99_latency_ms !== 'not measured') ? data.kpi.p99_latency_ms : state.kpi.p99_latency_ms
+        };
+        updateKPIs(state.kpi);
+      }
     } catch (err) {
       console.error("Error loading state:", err);
     }
@@ -565,7 +621,10 @@
       elements.feedContainer.innerHTML = '';
       if (elements.feedEmptyState) elements.feedEmptyState.classList.remove('hidden');
       elements.feedCount.textContent = '0 items';
-      updateKPIs({ events_scored: 0, allowed_count: 0, confirmed_count: 0, held_count: 0, human_review_count: 0, p99_latency_ms: 'not measured' });
+      state.kpi = { events_scored: 0, allowed_count: 0, confirmed_count: 0, held_count: 0, human_review_count: 0, p99_latency_ms: 'not measured' };
+      state.latencyPoints = [];
+      seenEventIds.clear();
+      updateKPIs(state.kpi);
       fetchFairness();
       showToast('Stream state and counters reset.', 'info');
     } catch (e) {}
@@ -590,6 +649,9 @@
     try {
       showToast(`Injecting scenario: ${label}...`, 'info');
       const res = await apiCall(`/api/scenario/${name}`, 'POST');
+      if (res && res.id && res.decision) {
+        addDecisionToFeed(res);
+      }
       showToast(`Scenario ${label} processed: Decision [${res.decision}]`, 'success');
     } catch (e) {}
   }
@@ -619,6 +681,9 @@
       elements.btnManualScore.disabled = true;
       elements.btnManualScore.textContent = 'Scoring...';
       const res = await apiCall('/api/score', 'POST', payload);
+      if (res && res.id && res.decision) {
+        addDecisionToFeed(res);
+      }
       showToast(`Payment scored: [${res.decision}] - Score: ${(res.score * 100).toFixed(1)}%`, 'success');
     } catch (err) {
       // error handled
@@ -702,6 +767,11 @@
     fetchMetrics();
     fetchFairness();
     connectSSE();
+
+    // Periodically sync KPI state every 3 seconds to ensure real-time accuracy
+    setInterval(() => {
+      fetchState();
+    }, 3000);
   });
 
 })();

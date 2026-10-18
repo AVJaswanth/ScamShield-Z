@@ -21,6 +21,7 @@ import asyncio
 from typing import Optional, Literal
 from datetime import datetime, timezone
 import yaml
+import numpy as np
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -456,6 +457,7 @@ async def inject_scenario(name: str):
             feature_store.record_event(current_t - (i * 1200 + 300), v_id, mule_payee, 450.0, "dev_v")
 
         s_id = tokenize("latest_victim_snd", salt, "snd")
+        feature_store.record_event(current_t - 86400 * 2, s_id, "pay_known_grocery", 50.0, "dev_app")
         payment = {
             "id": f"scen_mule_{uuid.uuid4().hex[:6]}",
             "ts": now_iso,
@@ -493,8 +495,8 @@ async def inject_scenario(name: str):
         # New device login in middle of night (03:00) sending $5,200
         s_id = tokenize("ato_victim_44", salt, "snd")
         p_id = tokenize("offshore_exchange", salt, "pay")
-        # Established user on dev_iphone
-        feature_store.record_event(current_t - 86400 * 7, s_id, "pay_landlord", 950.0, "dev_iphone")
+        # Established user on dev_iphone with modest daily spending
+        feature_store.record_event(current_t - 86400 * 7, s_id, "pay_grocery", 65.0, "dev_iphone")
         payment = {
             "id": f"scen_ato_{uuid.uuid4().hex[:6]}",
             "ts": now_iso,
