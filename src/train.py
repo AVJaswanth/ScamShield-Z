@@ -239,35 +239,55 @@ def train_models(data_path="data/synthetic_payments.csv", config_path="config.ya
     t_low, t_med, t_high, opt_cost = tune_cost_thresholds(y_val, val_probs, costs)
     print(f"Tuned Thresholds -> T_low: {t_low}, T_med: {t_med}, T_high: {t_high} (Validation Cost: ${opt_cost:,.2f})")
 
-    # 6. Check Optional External Datasets
+    # 6. Check Optional External Datasets (ULB Credit Card / PaySim)
     external_benchmarks = "not measured (data/external/creditcard.csv or paysim not present)"
     external_paths = [
-        "data/external/creditcard.csv",
-        "data/external/paysim.csv",
-        "data/creditcard.csv"
+        os.path.join(BASE_DIR, "data", "external", "creditcard.csv"),
+        os.path.join(BASE_DIR, "data", "external", "paysim.csv"),
+        os.path.join(BASE_DIR, "data", "creditcard.csv"),
+        "data/external/creditcard.csv"
     ]
     for ext_p in external_paths:
         if os.path.exists(ext_p):
-            print(f"Found optional external dataset at {ext_p}, computing benchmark...")
+            print(f"Found optional external benchmark dataset at {ext_p}, evaluating...")
             try:
-                ext_df = pd.read_csv(ext_p, nrows=50000)
-                # If ULB credit card: Class column
-                target_col = "Class" if "Class" in ext_df.columns else "isFraud"
-                if target_col in ext_df.columns:
-                    ext_y = ext_df[target_col].values
+                # Load up to 100,000 rows for real-world benchmarking
+                ext_df = pd.read_csv(ext_p, nrows=100000)
+                target_col = "Class" if "Class" in ext_df.columns else ("isFraud" if "isFraud" in ext_df.columns else None)
+                if target_col and target_col in ext_df.columns:
+                    ext_y = ext_df[target_col].astype(int).values
                     ext_X = ext_df.drop(columns=[target_col]).select_dtypes(include=[np.number]).fillna(0).values
-                    ext_split = int(len(ext_X) * 0.7)
-                    ext_lgbm = lgb.LGBMClassifier(n_estimators=50, random_state=42, verbosity=-1)
-                    ext_lgbm.fit(ext_X[:ext_split], ext_y[:ext_split])
-                    ext_p_pred = ext_lgbm.predict_proba(ext_X[ext_split:])[:, 1]
-                    ext_pr_auc = float(average_precision_score(ext_y[ext_split:], ext_p_pred))
+                    ext_split = int(len(ext_X) * 0.70)
+                    X_tr, y_tr = ext_X[:ext_split], ext_y[:ext_split]
+                    X_te, y_te = ext_X[ext_split:], ext_y[ext_split:]
+
+                    ext_lgbm = lgb.LGBMClassifier(
+                        n_estimators=80,
+                        learning_rate=0.08,
+                        scale_pos_weight=10.0,
+                        random_state=42,
+                        verbosity=-1
+                    )
+                    ext_lgbm.fit(X_tr, y_tr)
+                    ext_probs = ext_lgbm.predict_proba(X_te)[:, 1]
+
+                    ext_pr_auc = float(average_precision_score(y_te, ext_probs))
+                    ext_roc_auc = float(roc_auc_score(y_te, ext_probs))
+                    ext_recall_1pct = float(compute_recall_at_fpr(y_te, ext_probs, target_fpr=0.01))
+
                     external_benchmarks = {
                         "dataset": os.path.basename(ext_p),
+                        "source": "ULB Machine Learning Group (Real Credit Card Transactions)" if "creditcard" in ext_p.lower() else "PaySim Financial Simulator",
+                        "rows_evaluated": len(ext_df),
+                        "test_fraud_count": int(np.sum(y_te)),
                         "pr_auc": round(ext_pr_auc, 4),
-                        "rows_evaluated": len(ext_df)
+                        "roc_auc": round(ext_roc_auc, 4),
+                        "recall_at_1pct_fpr": round(ext_recall_1pct, 4),
+                        "note": "Real-world dataset baseline showing expected non-saturated metrics with authentic transactional noise."
                     }
-                    print(f"External Benchmark ({os.path.basename(ext_p)}) -> PR-AUC: {ext_pr_auc:.4f}")
+                    print(f"External Benchmark ({os.path.basename(ext_p)}) -> PR-AUC: {ext_pr_auc:.4f} | ROC-AUC: {ext_roc_auc:.4f} | Recall@1% FPR: {ext_recall_1pct:.4f}")
             except Exception as e:
+                print(f"External benchmark warning: {e}")
                 external_benchmarks = f"error benchmarking external data: {str(e)}"
             break
 
@@ -276,6 +296,7 @@ def train_models(data_path="data/synthetic_payments.csv", config_path="config.ya
     metrics_report = {
         "synthetic_data": True,
         "data_label": "[SYNTHETIC DATA]",
+        "synthetic_data_disclaimer": "Metrics on synthetic_payments.csv reflect clean separation of the planted fraud patterns (demonstrating feature extraction & ONNX pipeline integrity). They do not represent real-world deployment accuracy on noisy bank data. See external_benchmarks (ULB Credit Card) for real-world baseline.",
         "total_events": total_rows,
         "splits": {
             "train_events": len(X_train),

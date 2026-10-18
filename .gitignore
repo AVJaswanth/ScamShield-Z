@@ -1,4 +1,6 @@
 # Data files
+data/**/*.csv
+data/**/*.jsonl
 data/*.csv
 data/*.jsonl
 

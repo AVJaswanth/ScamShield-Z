@@ -7,7 +7,7 @@
 
 ## 1. What It Is
 
-**ScamShield Z** is a real-time scam and authorized push payment (APP) fraud detection and decisioning engine. It intercepts payments at sub-millisecond latency (sub-0.35ms p99) and executes real-time AI scoring, 4-tier risk policy enforcement, rule-bounded explainability, and demographic fairness audits.
+**ScamShield Z** is a real-time scam and authorized push payment (APP) fraud detection and decisioning engine. It intercepts payments at sub-millisecond latency (sub-0.50ms p99, measured 0.492ms) and executes real-time AI scoring, 4-tier risk policy enforcement, rule-bounded explainability, and demographic fairness audits.
 
 In modern banking, Authorized Push Payment (APP) scams trick legitimate account owners into sending money to fraudsters. Traditional rule engines and post-transaction batch analytics are too slow: once funds leave the bank via immediate payment rails, recovery is near impossible. ScamShield Z brings low-latency AI inference directly into the transactional path to intervene *before* funds are disbursed.
 
@@ -40,7 +40,7 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
 | Component | Target Production Architecture (IBM Z) | What Ran in this Demo (Local Laptop) | Real Metric / Verification |
 | :--- | :--- | :--- | :--- |
-| **Scoring Engine** | IBM z16 Integrated On-Chip AI Accelerator (Telum processor) via WML for z/OS | Local CPU execution via ONNX Runtime session (`LOCAL_ONNX`) | p50 = 0.079 ms, p99 = 0.325 ms (measured over 100,000 transactions) |
+| **Scoring Engine** | IBM z16 Integrated On-Chip AI Accelerator (Telum processor) via WML for z/OS | Local CPU execution via ONNX Runtime session (`LOCAL_ONNX`) | p50 = 0.105 ms, p99 = 0.492 ms (4,890.1 txn/sec over 100,000 transactions) |
 | **Model Parity** | Quantized compiler execution on z16 Telum NNPA hardware | Exported ONNX Open Neural Network Exchange graph | Max difference between native model & ONNX: **5.93e-08** (tolerance < 1e-05) |
 | **Feature Store** | In-memory transactional state store on z/OS | In-memory bounded deque store (`src/features.py`) | Zero future leakage ($t_i$ computed strictly from events $< t_i$) |
 | **Backend Switching** | REST adapter targeting WMLz endpoint (`WMLZ_HTTP`) | Fallback adapter with auto-disabled toggle and explanatory tooltip when URL is unset | Verified in E2E suite |
@@ -65,7 +65,7 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
              │
              ▼
   [ Dual AI Scoring Engine (src/scorer.py) ]
-    ├── LOCAL_ONNX (Laptop CPU Runtime) ─────────► Measured p99: 0.325 ms
+    ├── LOCAL_ONNX (Laptop CPU Runtime) ─────────► Measured p99: 0.492 ms
     └── WMLZ_HTTP (IBM Watson ML for z/OS) ──────► On-chip Telum AI Accelerator
              │
              ▼
@@ -89,12 +89,13 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
 ## 5. Measured Model Evaluation Metrics
 
-*All metrics below are copied verbatim from [`reports/metrics.json`](reports/metrics.json), produced by running `src/train.py` on the strict 70/15/15 chronological split of the 200,000 synthetic payment stream.*
+*All metrics below are copied verbatim from [`reports/metrics.json`](reports/metrics.json), produced by running `src/train.py` on the strict 70/15/15 chronological split of the 200,000 synthetic payment stream and the external ULB Credit Card fraud benchmark (`data/external/creditcard.csv`).*
 
 ```json
 {
   "synthetic_data": true,
   "data_label": "[SYNTHETIC DATA]",
+  "synthetic_data_disclaimer": "Metrics on synthetic_payments.csv reflect clean separation of the planted fraud patterns (demonstrating feature extraction & ONNX pipeline integrity). They do not represent real-world deployment accuracy on noisy bank data. See external_benchmarks (ULB Credit Card) for real-world baseline.",
   "total_events": 200000,
   "splits": {
     "train_events": 140000,
@@ -128,16 +129,25 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
     "t_high": 0.65,
     "human_review_amount": 5000.0
   },
-  "external_benchmarks": "not measured (data/external/creditcard.csv or paysim not present)"
+  "external_benchmarks": {
+    "dataset": "creditcard.csv",
+    "source": "ULB Machine Learning Group (Real Credit Card Transactions)",
+    "rows_evaluated": 100000,
+    "test_fraud_count": 48,
+    "pr_auc": 0.2803,
+    "roc_auc": 0.8857,
+    "recall_at_1pct_fpr": 0.7708,
+    "note": "Real-world dataset baseline showing expected non-saturated metrics with authentic transactional noise."
+  }
 }
 ```
 
 ### Latency Performance ([`reports/latency.json`](reports/latency.json)):
 - **Total Transactions Replayed:** 100,000
-- **Throughput:** 6,789.5 transactions / second
-- **p50 Latency:** 0.079 ms (78.7 µs)
-- **p95 Latency:** 0.228 ms (227.7 µs)
-- **p99 Latency:** 0.325 ms (325.4 µs)
+- **Throughput:** 4,890.1 transactions / second
+- **p50 Latency:** 0.105 ms (104.6 µs)
+- **p95 Latency:** 0.320 ms (319.5 µs)
+- **p99 Latency:** 0.492 ms (491.7 µs)
 
 ---
 
@@ -168,9 +178,10 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
 ## 7. 3-Minute Demo Script
 
-- **Minute 0:00 – 0:30 | The Critical Decision Context**
-  - Open `http://127.0.0.1:8000`. Point out the header badge: `Backend: LOCAL_ONNX` with sub-0.35ms p99 response times.
+- **Minute 0:00 – 0:30 | The Critical Decision Context & Model Transparency**
+  - Open `http://127.0.0.1:8000`. Point out the header badge: `Backend: LOCAL_ONNX` with sub-0.50ms p99 response times (measured 0.492 ms at 4,890 txn/sec).
   - Explain the IBM Z Datathon theme: Real-Time AI for Critical Decisions. In payments, the critical decision happens in the ~50ms payment authorization window before funds are irrevocably cleared.
+  - **Be transparent with judges on metrics:** State clearly that the synthetic payment dataset achieves ROC-AUC 1.0 because the planted attack patterns have distinct behavioral signatures designed to prove feature extraction and ONNX execution mechanics. Then point to the **Real Data Baseline (ULB Credit Card)** in the Model Metrics panel (ROC-AUC 0.8857, Recall@1% FPR 0.7708) to demonstrate authentic real-world model performance on noisy transactions.
 - **Minute 0:30 – 1:30 | Live Stream & Injected Attack Patterns**
   - Click **Start Stream** and adjust speed to **5x**. Watch normal transactions stream in with green `[ALLOW]` badges.
   - Click the **New Payee ($4.5k)** scenario button. An immediate `[HOLD]` decision flashes in the feed.
@@ -191,7 +202,7 @@ Open your browser to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 ## 8. Known Limitations
 
 1. **Local vs Enterprise AI Accelerator:** While this demo runs locally using ONNX Runtime on CPU, production IBM Z deployments run models directly on the Telum processor's dedicated Neural Network Processing Assist (NNPA) coprocessor via IBM Watson Machine Learning for z/OS.
-2. **Synthetic Data Realism:** Although synthetic transactions realistically mirror Authorized Push Payment fraud typologies (APP), real-world fraud distributions feature evolving adversarial drift and cross-institution mule networks.
+2. **Synthetic vs Real Data Realism:** The synthetic dataset has 60 test fraud cases planted with distinct behavioral signatures, yielding near-perfect separation (ROC-AUC 1.0) to prove pipeline mechanics. In contrast, real banking data contains subtle adversarial shifts—as illustrated by our genuine ULB benchmark (ROC-AUC 0.8857, PR-AUC 0.2803).
 3. **Generative Rewrite Hook:** An optional generative text rewriter hook is provided in `src/explain.py` but is intentionally kept `OFF` by default to prevent non-deterministic language generation in critical regulatory banking compliance paths.
 
 ---

@@ -465,9 +465,21 @@
         const lr = data.models.baseline_logistic_regression || {};
         const lgb = data.models.lightgbm_production || {};
 
+        const ext = (typeof data.external_benchmarks === 'object' && data.external_benchmarks !== null) ? data.external_benchmarks : null;
+        const extRow = ext ? `
+          <tr style="background: rgba(56, 189, 248, 0.05);">
+            <td><strong>ULB Credit Card Fraud (Real Benchmark)</strong></td>
+            <td><strong>${ext.pr_auc || 'not measured'}</strong></td>
+            <td><strong>${ext.roc_auc || 'not measured'}</strong></td>
+            <td>${ext.recall_at_1pct_fpr || 'not measured'}</td>
+            <td>N/A (Real Data)</td>
+            <td><span class="badge" style="background:#0284c722;color:#38bdf8;">REAL DATA BASELINE</span></td>
+          </tr>
+        ` : '';
+
         elements.metricsTableBody.innerHTML = `
           <tr>
-            <td><strong>Baseline Logistic Regression</strong></td>
+            <td><strong>Baseline Logistic Regression</strong> <span class="badge badge-synthetic">[SYNTHETIC]</span></td>
             <td>${lr.pr_auc || 'not measured'}</td>
             <td>${lr.roc_auc || 'not measured'}</td>
             <td>${lr.recall_at_1pct_fpr || 'not measured'}</td>
@@ -475,13 +487,14 @@
             <td><span class="badge badge-status">Baseline</span></td>
           </tr>
           <tr>
-            <td><strong>LightGBM (ONNX Runtime)</strong></td>
+            <td><strong>LightGBM (ONNX Runtime)</strong> <span class="badge badge-synthetic">[SYNTHETIC]</span></td>
             <td><strong>${lgb.pr_auc || 'not measured'}</strong></td>
             <td><strong>${lgb.roc_auc || 'not measured'}</strong></td>
             <td><strong>${lgb.recall_at_1pct_fpr || 'not measured'}</strong></td>
             <td>${lgb.onnx_max_abs_diff_1000_samples ? lgb.onnx_max_abs_diff_1000_samples.toExponential(2) : 'not measured'}</td>
             <td><span class="badge" style="background:#22c55e22;color:#22c55e;">VERIFIED PASS</span></td>
           </tr>
+          ${extRow}
         `;
       } else {
         elements.metricsTableBody.innerHTML = `

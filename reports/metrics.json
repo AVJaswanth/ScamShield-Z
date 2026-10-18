@@ -1,6 +1,7 @@
 {
   "synthetic_data": true,
   "data_label": "[SYNTHETIC DATA]",
+  "synthetic_data_disclaimer": "Metrics on synthetic_payments.csv reflect clean separation of the planted fraud patterns (demonstrating feature extraction & ONNX pipeline integrity). They do not represent real-world deployment accuracy on noisy bank data. See external_benchmarks (ULB Credit Card) for real-world baseline.",
   "total_events": 200000,
   "splits": {
     "train_events": 140000,
@@ -34,5 +35,14 @@
     "t_high": 0.65,
     "human_review_amount": 5000.0
   },
-  "external_benchmarks": "not measured (data/external/creditcard.csv or paysim not present)"
+  "external_benchmarks": {
+    "dataset": "creditcard.csv",
+    "source": "ULB Machine Learning Group (Real Credit Card Transactions)",
+    "rows_evaluated": 100000,
+    "test_fraud_count": 48,
+    "pr_auc": 0.2803,
+    "roc_auc": 0.8857,
+    "recall_at_1pct_fpr": 0.7708,
+    "note": "Real-world dataset baseline showing expected non-saturated metrics with authentic transactional noise."
+  }
 }
