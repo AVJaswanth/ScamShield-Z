@@ -216,30 +216,7 @@ flowchart TD
 
 ---
 
-## 7. 3-Minute Demo Script
-
-- **Minute 0:00 – 0:30 | The Critical Decision Context & Model Transparency**
-  - Open `http://127.0.0.1:8000`. Point out the header badge: `Backend: LOCAL_ONNX` with sub-0.50ms p99 response times (measured 0.492 ms at 4,890 txn/sec).
-  - Explain the IBM Z Datathon theme: Real-Time AI for Critical Decisions. In payments, the critical decision happens in the ~50ms payment authorization window before funds are irrevocably cleared.
-  - **Be transparent with judges on metrics:** State clearly that the synthetic payment dataset achieves ROC-AUC 1.0 because the planted attack patterns have distinct behavioral signatures designed to prove feature extraction and ONNX execution mechanics. Then point to the **Real Data Baseline (ULB Credit Card)** in the Model Metrics panel (ROC-AUC 0.8857, Recall@1% FPR 0.7708) to demonstrate authentic real-world model performance on noisy transactions.
-- **Minute 0:30 – 1:30 | Live Stream & Injected Attack Patterns**
-  - Click **Start Stream** and adjust speed to **5x**. Watch normal transactions stream in with green `[ALLOW]` badges.
-  - Click the **New Payee ($4.5k)** scenario button. An immediate `[HOLD]` decision flashes in the feed.
-  - Click the **Mule Fan-In** scenario button. Show how the feature store detected that 18 distinct victims transferred funds to this mule today, triggering step-up confirmation `[CONFIRM]`.
-  - Click the **Account Takeover** button. Show how a new device at 03:00 submitting $5,200 is escalated to `[HUMAN_REVIEW]`.
-- **Minute 1:30 – 2:15 | Explainability & Human Agency**
-  - Look at the **Customer Notification View** panel. Highlight the plain English sentence: *"You have never sent a payment to this recipient account before."*
-  - Emphasize Rule 1 & Explainability rules: this explanation was derived strictly from LightGBM tree SHAP contributions mapped to a deterministic template—zero hallucinated LLM text.
-  - In the decision feed, click **Release payment** on a held item and **Confirm payment** on a step-up card, showing interactive resolution.
-- **Minute 2:15 – 3:00 | Vulnerable Customers & Algorithmic Fairness**
-  - Toggle **Vulnerable Mode** switch in the header.
-  - Run the manual payment form with amount `$3,400`. Notice how vulnerable customer protections escalate the decision by one full band and trigger the *"🛡️ Trusted Contact Alert"* safeguard.
-  - Review the **Fairness & Disparate Impact Audit Table**: confirm that hold rates across `18-34`, `35-59`, and `60+` maintain a demographic gap $< 0.05$ (Status: `FAIR`).
-  - Click **Export Audit CSV** to download `scamshield_audit_log.csv`.
-
----
-
-## 8. Known Limitations
+## 7. Known Limitations
 
 1. **Local vs Enterprise AI Accelerator:** While this demo runs locally using ONNX Runtime on CPU, production IBM Z deployments run models directly on the Telum processor's dedicated Neural Network Processing Assist (NNPA) coprocessor via IBM Watson Machine Learning for z/OS.
 2. **Synthetic vs Real Data Realism:** The synthetic dataset has 60 test fraud cases planted with distinct behavioral signatures, yielding near-perfect separation (ROC-AUC 1.0) to prove pipeline mechanics. In contrast, real banking data contains subtle adversarial shifts—as illustrated by our genuine ULB benchmark (ROC-AUC 0.8857, PR-AUC 0.2803).
@@ -247,7 +224,7 @@ flowchart TD
 
 ---
 
-## 9. Open-Source Resources, Datasets, and Licenses
+## 8. Open-Source Resources, Datasets, and Licenses
 
 ### Core Machine Learning & Model Export
 - **LightGBM:** High-performance gradient boosting framework.  
